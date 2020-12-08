@@ -6,7 +6,7 @@ public class City extends DataSupport {
     private int id;
     private String cityName;
     private int cityCode;
-    private int provinceId;
+    private int provinceId;//used for classifying city item
 
     public int getId() {
         return id;
