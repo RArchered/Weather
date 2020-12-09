@@ -3,8 +3,8 @@ package com.example.weather.gson;
 import com.google.gson.annotations.SerializedName;
 
 public class Suggestion {
-    @SerializedName("conf")
-    public Confort confort;
+    @SerializedName("comf")
+    public Comfort comfort;
 
     @SerializedName("sport")
     public Sport sport;
@@ -12,7 +12,7 @@ public class Suggestion {
     @SerializedName("cw")
     public CarWash carWash;
 
-    public class Confort {
+    public class Comfort {
         public String txt;
     }
 
