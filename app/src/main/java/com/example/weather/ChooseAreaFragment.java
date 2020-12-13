@@ -113,6 +113,7 @@ public class ChooseAreaFragment extends Fragment {
             //resolve city json at the first time
             showProgressDialog();
             final Activity activity = getActivity();
+            //process in a new thread to avoid ANR
             new Thread(() -> {
                boolean result = Utility.handleTianqiCity(activity);
                if (result) {
