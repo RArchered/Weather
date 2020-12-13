@@ -1,5 +1,6 @@
 package com.example.weather;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
@@ -13,31 +14,22 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
-import com.example.weather.db.City;
-import com.example.weather.db.County;
-import com.example.weather.db.Province;
-import com.example.weather.gson.Weather;
-import com.example.weather.util.HttpUtil;
+import com.example.weather.db.TianqiCity;
+import com.example.weather.db.TianqiLeader;
+import com.example.weather.db.TianqiProvince;
 import com.example.weather.util.Utility;
 
 import org.litepal.crud.DataSupport;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.Response;
-
 public class ChooseAreaFragment extends Fragment {
     public static final int LEVEL_PROVINCE = 0;
-    public static final int LEVEL_CITY = 1;
-    public static final int LEVEL_COUNTY = 2;
+    public static final int LEVEL_LEADER = 1;
+    public static final int LEVEL_CITY = 2;
     private ProgressDialog progressDialog;
     private TextView titleText;
     private Button backButton;
@@ -45,15 +37,15 @@ public class ChooseAreaFragment extends Fragment {
     private ArrayAdapter<String> adapter;
     private List<String> dataList = new ArrayList<>();
     //provinces
-    private List<Province> provinceList;
+    private List<TianqiProvince> provinceList;
     //cities
-    private List<City> cityList;
+    private List<TianqiLeader> leaderList;
     //counties
-    private List<County> countyList;
-    //selected province
-    private Province selectedProvince;
+    private List<TianqiCity> cityList;
+    //selected provincep
+    private TianqiProvince selectedProvince;
     //selected city
-    private City selectedCity;
+    private TianqiLeader selectedLeader;
     //current level
     private int currentLevel;
 
@@ -77,29 +69,29 @@ public class ChooseAreaFragment extends Fragment {
                 (AdapterView<?> parent, View view, int position, long id) -> {
                     if (currentLevel == LEVEL_PROVINCE) {
                         selectedProvince = provinceList.get(position);
+                        queryLeaders();
+                    } else if (currentLevel == LEVEL_LEADER) {
+                        selectedLeader = leaderList.get(position);
                         queryCities();
                     } else if (currentLevel == LEVEL_CITY) {
-                        selectedCity = cityList.get(position);
-                        queryCounties();
-                    } else if (currentLevel == LEVEL_COUNTY) {
-                        String weatherId = countyList.get(position).getWeatherId();
+                        String cityId = cityList.get(position).getCityId();
                         if (getActivity() instanceof MainActivity) {
                             Intent intent = new Intent(getActivity(), WeatherActivity.class);
-                            intent.putExtra("weather_id", weatherId);
+                            intent.putExtra("city_id", cityId);
                             startActivity(intent);
                             getActivity().finish();
                         } else if (getActivity() instanceof WeatherActivity) {
                             WeatherActivity activity = (WeatherActivity) getActivity();
                             activity.drawerLayout.closeDrawers();
                             activity.swipeRefresh.setRefreshing(true);
-                            activity.requestWeather(weatherId);
+                            activity.requestWeather(cityId);
                         }
                     }
                 });
         backButton.setOnClickListener(v -> {
-                    if (currentLevel == LEVEL_COUNTY) {
-                        queryCities();
-                    } else if (currentLevel == LEVEL_CITY) {
+                    if (currentLevel == LEVEL_CITY) {
+                        queryLeaders();
+                    } else if (currentLevel == LEVEL_LEADER) {
                         queryProvinces();
                     }
                 });
@@ -109,64 +101,85 @@ public class ChooseAreaFragment extends Fragment {
     private void queryProvinces() {
         titleText.setText("中国");
         backButton.setVisibility(View.GONE);
-        provinceList = DataSupport.findAll(Province.class);
+        provinceList = DataSupport.findAll(TianqiProvince.class);
         if (provinceList.size() > 0) {
             dataList.clear();
-            for (Province province : provinceList) {
-                dataList.add(province.getProvinceName());
+            for (TianqiProvince province : provinceList) {
+                dataList.add(province.getProvinceZh());
             }
             adapter.notifyDataSetChanged();
             currentLevel = LEVEL_PROVINCE;
         } else {
-            String address = "http://guolin.tech/api/china";
-            //set usesCleartextTraffic as true
-            queryFromServer(address, "province");
+            //resolve city json at the first time
+            showProgressDialog();
+            final Activity activity = getActivity();
+            new Thread(() -> {
+               boolean result = Utility.handleTianqiCity(activity);
+               if (result) {
+                   activity.runOnUiThread(() -> {
+                      closeProgressDialog();
+                      queryProvinces();
+                   });
+               } else {
+                   activity.runOnUiThread(() -> {
+                       closeProgressDialog();
+                       Toast.makeText(activity, "加载城市错误",
+                               Toast.LENGTH_SHORT).show();
+                   });
+               }
+            }).start();
+        }
+    }
+
+    private void queryLeaders() {
+        titleText.setText(selectedProvince.getProvinceZh());
+        backButton.setVisibility(View.VISIBLE);
+        leaderList = DataSupport.where("provinceZh = ?",
+                String.valueOf(selectedProvince.getProvinceZh())).find(TianqiLeader.class);
+        if (leaderList.size() > 0) {
+            dataList.clear();
+            for (TianqiLeader leader : leaderList) {
+                dataList.add(leader.getLeaderZh());
+            }
+            adapter.notifyDataSetChanged();
+            listView.setSelection(0);
+            currentLevel = LEVEL_LEADER;
+        } else {
+            Toast.makeText(getActivity(), "加载城市错误", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void queryCities() {
-        titleText.setText(selectedProvince.getProvinceName());
+        titleText.setText(selectedLeader.getLeaderZh());
         backButton.setVisibility(View.VISIBLE);
-        cityList = DataSupport.where("provinceId = ?",
-                String.valueOf(selectedProvince.getId())).find(City.class);
+        cityList = DataSupport.where("leaderZh = ?",
+                String.valueOf(selectedLeader.getLeaderZh())).find(TianqiCity.class);
         if (cityList.size() > 0) {
             dataList.clear();
-            for (City city : cityList) {
-                dataList.add(city.getCityName());
+            for (TianqiCity city : cityList) {
+                dataList.add(city.getCityZh());
             }
             adapter.notifyDataSetChanged();
             listView.setSelection(0);
             currentLevel = LEVEL_CITY;
         } else {
-            int provinceCode = selectedProvince.getProvinceCode();
-            String address = "http://guolin.tech/api/china/" + provinceCode;
-            queryFromServer(address, "city");
+            Toast.makeText(getActivity(), "加载城市错误", Toast.LENGTH_SHORT).show();
         }
     }
 
-    private void queryCounties() {
-        titleText.setText(selectedCity.getCityName());
-        backButton.setVisibility(View.VISIBLE);
-        countyList = DataSupport.where("cityId = ?",
-                String.valueOf(selectedCity.getId())).find(County.class);
-        if (countyList.size() > 0) {
-            dataList.clear();
-            for (County county : countyList) {
-                dataList.add(county.getCountyName());
-            }
-            adapter.notifyDataSetChanged();
-            listView.setSelection(0);
-            currentLevel = LEVEL_COUNTY;
-        } else {
-            int provinceCode = selectedProvince.getProvinceCode();
-            int cityCode = selectedCity.getCityCode();
-            String address = "http://guolin.tech/api/china/" + provinceCode +
-                    "/" + cityCode;
-            queryFromServer(address, "county");
+    public void onBackPressed() {
+        if (currentLevel == LEVEL_CITY) {
+            queryLeaders();
+        } else if (currentLevel == LEVEL_LEADER) {
+            queryProvinces();
         }
     }
 
-    private void queryFromServer(String address, final String type) {
+    public int getCurrentLevel() {
+        return  currentLevel;
+    }
+
+    /*private void queryFromServer(String address, final String type) {
         showProgressDialog();
         HttpUtil.sendOkHttpRequest(address, new Callback() {
             @Override
@@ -206,11 +219,11 @@ public class ChooseAreaFragment extends Fragment {
             }
         });
     }
-
+    */
     private void showProgressDialog() {
         if (progressDialog == null) {
             progressDialog = new ProgressDialog(getActivity());
-            progressDialog.setMessage("加载中...");
+            progressDialog.setMessage("第一次加载中...");
             progressDialog.setCanceledOnTouchOutside(false);
         }
         progressDialog.show();

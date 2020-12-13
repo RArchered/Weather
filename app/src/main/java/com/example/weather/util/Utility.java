@@ -1,101 +1,129 @@
 package com.example.weather.util;
 
+import android.content.Context;
+import android.content.res.AssetManager;
 import android.text.TextUtils;
-import android.util.Log;
 
-import com.example.weather.db.City;
-import com.example.weather.db.County;
-import com.example.weather.db.Province;
+import com.example.weather.db.TianqiCity;
+import com.example.weather.db.TianqiLeader;
+import com.example.weather.db.TianqiProvince;
 import com.example.weather.gson.Weather;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.litepal.crud.DataSupport;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.List;
 
 public class Utility {
 
-    /**
-     * resolve and process the province data from server
-     */
-    public static boolean handleProvinceResponse(String response) {
-        if (!TextUtils.isEmpty(response)) {
-            try {
-                JSONArray allProvinces = new JSONArray(response);
-                for (int i = 0; i < allProvinces.length(); i++) {
-                    JSONObject provinceObject = allProvinces.getJSONObject(i);
-                    Province province = new Province();
-                    province.setProvinceName(provinceObject.getString("name"));
-                    province.setProvinceCode(provinceObject.getInt("id"));
-                    province.save();
-                }
-                return true;
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
-    /**
-     * resolve and process the city data from server
-     */
-    public static boolean handleCityResponse(String response, int provinceId) {
-        if (!TextUtils.isEmpty(response)) {
-            try {
-                JSONArray allCitys = new JSONArray(response);
-                for (int i = 0; i < allCitys.length(); i++) {
-                    JSONObject cityObject = allCitys.getJSONObject(i);
-                    City city = new City();
-                    city.setCityName(cityObject.getString("name"));
-                    city.setCityCode(cityObject.getInt("id"));
-                    city.setProvinceId(provinceId);
-                    city.save();
-                }
-                return true;
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
-    /**
-     * resolve and process the county data from server
-     */
-    public static boolean handleCountyResponse(String response, int cityId) {
-        if (!TextUtils.isEmpty(response)) {
-            try {
-                JSONArray allCountys = new JSONArray(response);
-                for (int i = 0; i < allCountys.length(); i++) {
-                    JSONObject countyObject = allCountys.getJSONObject(i);
-                    County county = new County();
-                    county.setCountyName(countyObject.getString("name"));
-                    county.setWeatherId(countyObject.getString("weather_id"));
-                    county.setCityId(cityId);
-                    county.save();
-                }
-                return true;
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-        }
-        return false;
-    }
-
     public static Weather handleWeatherResponse(String response) {
         try {
-            //Log.e("TAG", "handleWeatherResponse: error1");
-            JSONObject jsonObject = new JSONObject(response);
-            //Log.e("TAG", "handleWeatherResponse: error2");
-            JSONArray jsonArray = jsonObject.getJSONArray("HeWeather");
-            //Log.e("TAG", "handleWeatherResponse: error3");
-            String weatherContent = jsonArray.getJSONObject(0).toString();
-            //Log.e("TAG", "handleWeatherResponse: error4");
-            return new Gson().fromJson(weatherContent, Weather.class);
+            return new Gson().fromJson(response, Weather.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public static String getTianqiCityJson(String filename, Context context) {
+        StringBuilder stringBuilder = new StringBuilder();
+        try {
+            AssetManager assetManager = context.getAssets();
+            BufferedReader bufferedReader = new BufferedReader(
+                    new InputStreamReader(assetManager.open(filename)));
+            String line;
+            while ((line = bufferedReader.readLine()) != null) {
+                stringBuilder.append(line);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return stringBuilder.toString();
+    }
+
+    public static boolean handleTianqiCity(Context context) {
+        String tiqianCity = getTianqiCityJson("tianqi_city.json", context);
+        if (!TextUtils.isEmpty(tiqianCity)) {
+            try {
+                JSONArray allCitys = new JSONArray(tiqianCity);
+                String provinceZh_old = "";
+                String leaderZh_old = "";
+                String cityZh_old = "";
+                String cityId_old = "";
+                String leaderZh_new = "";
+                String cityZh_new = "";
+                String cityId_new = "";
+                String provinceZh_new = "";
+                for (int i = 0; i < allCitys.length(); i++) {
+                    JSONObject cityObject = allCitys.getJSONObject(i);
+                    provinceZh_old = provinceZh_new;
+                    leaderZh_old = leaderZh_new;
+                    cityZh_old = cityZh_new;
+                    cityId_old = cityId_new;
+                    provinceZh_new = cityObject.getString("provinceZh");
+                    leaderZh_new = cityObject.getString("leaderZh");
+                    cityZh_new = cityObject.getString("cityZh");
+                    cityId_new = cityObject.getString("id");
+                    if (!provinceZh_new.equals(provinceZh_old)) {
+                        saveProvince(provinceZh_new);
+                        saveLeader(provinceZh_new, leaderZh_new);
+                        saveCity(leaderZh_new, cityZh_new, cityId_new);
+                    } else if (!leaderZh_new.equals(leaderZh_old)) {
+                        //chongqing, tianjing, shanghai should be considered separately
+                        //to avoid insert same leader more than one time,
+                        //example: cq cq xs, cq jlp jlp, cq cq sz.
+                        if (leaderZh_new.equals("重庆")
+                            || leaderZh_new.equals("天津")
+                            || leaderZh_new.equals("上海")) {
+                            List<TianqiLeader> leaders = DataSupport.where(
+                                    "leaderZh = ?", leaderZh_new)
+                                    .find(TianqiLeader.class);
+                            if (leaders.isEmpty()) {
+                                saveLeader(provinceZh_new, leaderZh_new);
+                            }
+                        } else {
+                            saveLeader(provinceZh_new, leaderZh_new);
+                            saveCity(leaderZh_new, cityZh_new, cityId_new);
+                        }
+                    } else if (!cityId_new.equals(cityId_old)) {
+                        saveCity(leaderZh_new, cityZh_new, cityId_new);
+                    }
+                }
+                return true;
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+    return false;
+    }
+
+    private static void saveProvince(String provinceZh_new) {
+        //save province
+        TianqiProvince province = new TianqiProvince();
+        province.setProvinceZh(provinceZh_new);
+        province.save();
+    }
+
+    private static void saveLeader(String provinceZh_new, String leaderZh_new ) {
+        //save leader
+        TianqiLeader leader = new TianqiLeader();
+        leader.setProvinceZh(provinceZh_new);
+        leader.setLeaderZh(leaderZh_new);
+        leader.save();
+    }
+
+    private static void saveCity(String leaderZh_new, String cityZh_new, String cityId_new) {
+        //save city
+        TianqiCity city = new TianqiCity();
+        city.setLeaderZh(leaderZh_new);
+        city.setCityZh(cityZh_new);
+        city.setCityId(cityId_new);
+        city.save();
     }
 }

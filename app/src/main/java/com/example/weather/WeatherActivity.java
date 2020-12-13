@@ -1,12 +1,11 @@
 package com.example.weather;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.Log;
-import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -26,13 +25,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.example.weather.gson.Forecast;
 import com.example.weather.gson.Weather;
+import com.example.weather.service.AutoUpdateService;
 import com.example.weather.util.HttpUtil;
 import com.example.weather.util.Utility;
 
-import org.w3c.dom.Text;
-
 import java.io.IOException;
-import java.util.function.Predicate;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -42,19 +39,15 @@ public class WeatherActivity extends AppCompatActivity {
     public DrawerLayout drawerLayout;
     public SwipeRefreshLayout swipeRefresh;
 
+    private long mExitTime = System.currentTimeMillis() - 2000;
     private ScrollView weatherLayout;
     private TextView titleCity;
     private TextView titleUpdateTime;
     private TextView degreeText;
     private TextView weatherInfoText;
     private LinearLayout layoutForecast;
-    private TextView aqiText;
-    private TextView pm25Text;
-    private TextView comfortText;
-    private TextView carWashText;
-    private TextView sportText;
     private ImageView bingPicImg;
-    private String mWeatherId;
+    private String mCityId;
     private Button navButton;
 
     @Override
@@ -76,11 +69,6 @@ public class WeatherActivity extends AppCompatActivity {
         degreeText = (TextView) findViewById(R.id.degree_text);
         weatherInfoText = (TextView) findViewById(R.id.weather_info_text);
         layoutForecast = (LinearLayout) findViewById(R.id.layout_forecast);
-        aqiText = (TextView) findViewById(R.id.aqi_text);
-        pm25Text = (TextView) findViewById(R.id.pm25_text);
-        comfortText = (TextView) findViewById(R.id.comfort_text);
-        carWashText = (TextView) findViewById(R.id.car_wash_text);
-        sportText = (TextView) findViewById(R.id.sport_text);
         swipeRefresh = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh);
         drawerLayout = (DrawerLayout) findViewById(R.id.drawer_layout);
         navButton = (Button) findViewById(R.id.nav_button);
@@ -92,12 +80,12 @@ public class WeatherActivity extends AppCompatActivity {
         if (weatherString != null) {
             //use cache directly
             Weather weather = Utility.handleWeatherResponse(weatherString);
-            mWeatherId = weather.basic.weatherId;
+            mCityId = weather.cityid;
             showWeatherInfo(weather);
         } else {
-            mWeatherId = getIntent().getStringExtra("weather_id");
+            mCityId = getIntent().getStringExtra("city_id");
             weatherLayout.setVisibility(View.INVISIBLE);
-            requestWeather(mWeatherId);
+            requestWeather(mCityId);
         }
         String bingPic = prefs.getString("bing_pic", null);
         if (bingPic != null) {
@@ -109,15 +97,38 @@ public class WeatherActivity extends AppCompatActivity {
             //update weather based on current mWeatherId,
             //you should update the value in method "requestWeather"
             //because you will call this method in fragment.
-            requestWeather(mWeatherId);
+            requestWeather(mCityId);
         });
         navButton.setOnClickListener((v) -> {
             drawerLayout.openDrawer(GravityCompat.START);
         });
     }
 
-    public void requestWeather(final String weatherId) {
-        String weatherUrl = "http://guolin.tech/api/weather?cityid=" + weatherId;
+    @Override
+    public void onBackPressed() {
+        ChooseAreaFragment chooseAreaFragment = (ChooseAreaFragment)
+                getSupportFragmentManager().findFragmentById(R.id.choose_area_fragment);
+        if (drawerLayout.isOpen()
+            && chooseAreaFragment.getCurrentLevel() != ChooseAreaFragment.LEVEL_PROVINCE) {
+            chooseAreaFragment.onBackPressed();
+        } else if (drawerLayout.isOpen()
+            && chooseAreaFragment.getCurrentLevel() == ChooseAreaFragment.LEVEL_PROVINCE) {
+            drawerLayout.closeDrawers();
+        } else if (!drawerLayout.isOpen()) {
+            if (System.currentTimeMillis() - mExitTime > 2000) {
+                Toast.makeText(this, "再按返回键将退出应用", Toast.LENGTH_SHORT)
+                        .show();
+                mExitTime = System.currentTimeMillis();
+            } else {
+                finish();
+            }
+        }
+    }
+
+    public void requestWeather(final String cityId) {
+        String weatherUrl = "https://tianqiapi.com/api?version=v1" +
+                "&appid=89131264&appsecret=nSwK7fA7" +
+                "&cityid=" + cityId;
         HttpUtil.sendOkHttpRequest(weatherUrl, new Callback() {
             @Override
             public void onFailure(Call call, IOException e) {
@@ -136,14 +147,14 @@ public class WeatherActivity extends AppCompatActivity {
                 final Weather weather = Utility.handleWeatherResponse(responseText);
                 //define weather as final, this makes it can be captured by lambda
                 runOnUiThread(() -> {
-                    if (weather != null  && "ok".equals(weather.status)) {
+                    if (weather != null) {
                         SharedPreferences.Editor editor = PreferenceManager.
                                 getDefaultSharedPreferences(WeatherActivity.this).
                                 edit();
                         editor.putString("weather", responseText);
                         editor.apply();
                         //you must set mWeatheId because you will change city in fragment.
-                        mWeatherId = weather.basic.weatherId;
+                        mCityId = weather.cityid;
                         showWeatherInfo(weather);
                     } else {
                         Toast.makeText(WeatherActivity.this, "获取天气信息失败!",
@@ -157,10 +168,10 @@ public class WeatherActivity extends AppCompatActivity {
     }
 
     private void showWeatherInfo(Weather weather) {
-        String cityName = weather.basic.cityName;
-        String updateTime = weather.basic.update.updateTime.split(" ")[1];
-        String degree = weather.now.temperature + "℃";
-        String weatherInfo = weather.now.moreInfo.info;
+        String cityName = weather.city;
+        String updateTime = weather.update_time;
+        String degree = weather.forecastList.get(0).tem;
+        String weatherInfo = weather.forecastList.get(0).wea;
         titleCity.setText(cityName);
         titleUpdateTime.setText(updateTime);
         degreeText.setText(degree);
@@ -173,23 +184,16 @@ public class WeatherActivity extends AppCompatActivity {
             TextView infoText = (TextView) view.findViewById(R.id.info_text);
             TextView maxText = (TextView) view.findViewById(R.id.max_text);
             TextView minText = (TextView) view.findViewById(R.id.min_text);
-            dateText.setText(forecast.date);
-            infoText.setText(forecast.moreInfo.info);
-            maxText.setText(forecast.temperature.max);
-            minText.setText(forecast.temperature.min);
+            dateText.setText(forecast.day);
+            infoText.setText(forecast.wea);
+            maxText.setText(forecast.tem1);
+            minText.setText(forecast.tem2);
             layoutForecast.addView(view);
         }
-        if (weather.aqi != null) {
-            aqiText.setText(weather.aqi.aqiCity.aqi);
-            pm25Text.setText(weather.aqi.aqiCity.pm25);
-        }
-        String comfort = "舒适度: " + weather.suggestion.comfort.txt;
-        String carWash = "洗车指数: " + weather.suggestion.carWash.txt;
-        String sport = "运动建议: " + weather.suggestion.sport.txt;
-        comfortText.setText(comfort);
-        carWashText.setText(carWash);
-        sportText.setText(sport);
         weatherLayout.setVisibility(View.VISIBLE);
+
+        Intent intent = new Intent(this, AutoUpdateService.class);
+        startService(intent);
     }
 
     private void loadBingPic() {
