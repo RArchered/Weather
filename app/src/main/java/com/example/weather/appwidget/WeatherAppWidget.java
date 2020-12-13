@@ -33,6 +33,9 @@ public class WeatherAppWidget extends AppWidgetProvider {
                         weather.forecastList.get(0).wea);
                 remoteViews.setTextViewText(R.id.city_text,
                         weather.city);
+            } else {
+                remoteViews.setTextViewText(R.id.degree_text,
+                        "__");
             }
             appWidgetManager.updateAppWidget(appWidgetId, remoteViews);
         }
