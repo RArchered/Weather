@@ -122,6 +122,8 @@ public class ChooseAreaFragment extends Fragment {
                       queryProvinces();
                    });
                } else {
+                   //variable captured
+                   //generate bridge method by compiler
                    activity.runOnUiThread(() -> {
                        closeProgressDialog();
                        Toast.makeText(activity, "加载城市错误",
