@@ -2,9 +2,9 @@
     <dbname value="myweather"/>
     <version value="2"/>
     <list>
-        <mapping class="com.example.weather.db.TianqiProvince"/>
-        <mapping class="com.example.weather.db.TianqiLeader"/>
-        <mapping class="com.example.weather.db.TianqiCity"/>
+        <mapping class="com.example.weather.data.db.TianqiProvince"/>
+        <mapping class="com.example.weather.data.db.TianqiLeader"/>
+        <mapping class="com.example.weather.data.db.TianqiCity"/>
     </list>
 
 </litepal>

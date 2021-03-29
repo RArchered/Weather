@@ -4,9 +4,9 @@ import android.content.Context;
 import android.content.res.AssetManager;
 import android.text.TextUtils;
 
-import com.example.weather.db.TianqiCity;
-import com.example.weather.db.TianqiLeader;
-import com.example.weather.db.TianqiProvince;
+import com.example.weather.data.db.TianqiCity;
+import com.example.weather.data.db.TianqiLeader;
+import com.example.weather.data.db.TianqiProvince;
 import com.example.weather.gson.Weather;
 import com.google.gson.Gson;
 

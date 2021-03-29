@@ -5,8 +5,8 @@
     android:layout_height="match_parent">
 
     <fragment
-        android:id="@+id/choose_area_fragment"
-        android:name="com.example.weather.ChooseAreaFragment"
+        android:id="@+id/start_page_fragment"
+        android:name="com.example.weather.startpage.StartPageFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 

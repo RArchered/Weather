@@ -1,5 +1,6 @@
-package com.example.weather;
+package com.example.weather.concretepage;
 
+import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -7,7 +8,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.Button;
@@ -18,28 +18,29 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-
 import com.bumptech.glide.Glide;
+import com.example.weather.R;
 import com.example.weather.appwidget.WeatherAppWidget;
+import com.example.weather.data.TasksRepository;
 import com.example.weather.gson.Forecast;
 import com.example.weather.gson.Weather;
 import com.example.weather.service.AutoUpdateService;
-import com.example.weather.util.HttpUtil;
+import com.example.weather.startpage.StartPageFragment;
+import com.example.weather.startpage.StartPagePresenter;
 import com.example.weather.util.Utility;
 
-import java.io.IOException;
+public class ConcretePageActivity extends AppCompatActivity
+        implements ConcretePageContract.View {
 
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.Response;
+    private ConcretePageContract.Presenter mConcretePagePresenter;
+    private StartPagePresenter mStartPagePresenter;
 
-public class WeatherActivity extends AppCompatActivity {
     public DrawerLayout drawerLayout;
     public SwipeRefreshLayout swipeRefresh;
 
@@ -61,10 +62,10 @@ public class WeatherActivity extends AppCompatActivity {
             View decorView = getWindow().getDecorView();
             decorView.setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
             getWindow().setStatusBarColor(Color.TRANSPARENT);
         }
-        setContentView(R.layout.activity_weather);
+        setContentView(R.layout.concrete_page_activity);
         //initialize all controls
         bingPicImg = (ImageView) findViewById(R.id.bing_pic_img);
         weatherLayout = (ScrollView) findViewById(R.id.weather_layout);
@@ -79,7 +80,13 @@ public class WeatherActivity extends AppCompatActivity {
 
         swipeRefresh.setColorSchemeResources(R.color.colorPrimary);
 
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        //create two presenter, one for fragment, one for this activity.
+        new ConcretePagePresenter(TasksRepository.getInstance(), this);
+        mStartPagePresenter = new StartPagePresenter(TasksRepository.getInstance(),
+                (StartPageFragment) (getSupportFragmentManager()
+                        .findFragmentById(R.id.start_page_fragment)));
+
+        SharedPreferences prefs = mConcretePagePresenter.getDefaultSharedPreferences(this);
         String weatherString = prefs.getString("weather", null);
         if (weatherString != null) {
             //use cache directly
@@ -89,19 +96,19 @@ public class WeatherActivity extends AppCompatActivity {
         } else {
             mCityId = getIntent().getStringExtra("city_id");
             weatherLayout.setVisibility(View.INVISIBLE);
-            requestWeather(mCityId);
+            mConcretePagePresenter.requestWeather(mCityId);
         }
         String bingPic = prefs.getString("bing_pic", null);
         if (bingPic != null) {
             Glide.with(this).load(bingPic).into(bingPicImg);
         } else {
-            loadBingPic();
+            mConcretePagePresenter.loadBingPic();
         }
         swipeRefresh.setOnRefreshListener(() -> {
             //update weather based on current mWeatherId,
             //you should update the value in method "requestWeather"
             //because you will call this method in fragment.
-            requestWeather(mCityId);
+            mConcretePagePresenter.requestWeather(mCityId);
         });
         navButton.setOnClickListener((v) -> {
             drawerLayout.openDrawer(GravityCompat.START);
@@ -110,13 +117,13 @@ public class WeatherActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        ChooseAreaFragment chooseAreaFragment = (ChooseAreaFragment)
-                getSupportFragmentManager().findFragmentById(R.id.choose_area_fragment);
+        StartPageFragment startPageFragment = (StartPageFragment)
+                getSupportFragmentManager().findFragmentById(R.id.start_page_fragment);
         if (drawerLayout.isOpen()
-            && chooseAreaFragment.getCurrentLevel() != ChooseAreaFragment.LEVEL_PROVINCE) {
-            chooseAreaFragment.onBackPressed();
+                && mStartPagePresenter.getCurrentLevel() != StartPagePresenter.LEVEL_PROVINCE) {
+            mStartPagePresenter.onBackPressed();
         } else if (drawerLayout.isOpen()
-            && chooseAreaFragment.getCurrentLevel() == ChooseAreaFragment.LEVEL_PROVINCE) {
+                && mStartPagePresenter.getCurrentLevel() == StartPagePresenter.LEVEL_PROVINCE) {
             drawerLayout.closeDrawers();
         } else if (!drawerLayout.isOpen()) {
             if (System.currentTimeMillis() - mExitTime > 2000) {
@@ -129,49 +136,7 @@ public class WeatherActivity extends AppCompatActivity {
         }
     }
 
-    public void requestWeather(final String cityId) {
-        String weatherUrl = "https://tianqiapi.com/api?version=v1" +
-                "&appid=89131264&appsecret=nSwK7fA7" +
-                "&cityid=" + cityId;
-        HttpUtil.sendOkHttpRequest(weatherUrl, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                runOnUiThread(() -> {
-                    Toast.makeText(WeatherActivity.this, "获取天气信息失败",
-                            Toast.LENGTH_SHORT).show();
-                    swipeRefresh.setRefreshing(false);
-                });
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                final String responseText = response.body().string();
-                //Log.d("TAG", "onResponse: "+responseText);
-                //use response.body().string() not response.body().toString()......
-                final Weather weather = Utility.handleWeatherResponse(responseText);
-                //define weather as final, this makes it can be captured by lambda
-                runOnUiThread(() -> {
-                    if (weather != null) {
-                        SharedPreferences.Editor editor = PreferenceManager.
-                                getDefaultSharedPreferences(WeatherActivity.this).
-                                edit();
-                        editor.putString("weather", responseText);
-                        editor.apply();
-                        //you must set mWeatheId because you will change city in fragment.
-                        mCityId = weather.cityid;
-                        showWeatherInfo(weather);
-                    } else {
-                        Toast.makeText(WeatherActivity.this, "获取天气信息失败!",
-                                Toast.LENGTH_SHORT).show();
-                    }
-                    swipeRefresh.setRefreshing(false);
-                });
-            }
-        });
-        loadBingPic();//refresh bing pic when request weather info.
-    }
-
-    private void showWeatherInfo(Weather weather) {
+    public void showWeatherInfo(Weather weather) {
         String cityName = weather.city;
         String updateTime = weather.update_time;
         String degree = weather.forecastList.get(0).tem;
@@ -212,25 +177,65 @@ public class WeatherActivity extends AppCompatActivity {
         appWidgetManager.updateAppWidget(thisWidget, remoteViews);
     }
 
-    private void loadBingPic() {
-        String requestBingPic = "http://guolin.tech/api/bing_pic";
-        HttpUtil.sendOkHttpRequest(requestBingPic, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
-            }
+    public void requestWeather(final String cityId) {
+        mConcretePagePresenter.requestWeather(cityId);
+    }
 
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                final String bingPic = response.body().string();
-                SharedPreferences.Editor editor = PreferenceManager.
-                        getDefaultSharedPreferences(WeatherActivity.this).edit();
-                editor.putString("bing_pic", bingPic);
-                editor.apply();
-                runOnUiThread(() -> {
-                    Glide.with(WeatherActivity.this).load(bingPic).into(bingPicImg);
-                });
-            }
-        });
+    @Override
+    public void setPresenter(ConcretePageContract.Presenter presenter) {
+        mConcretePagePresenter = presenter;
+    }
+
+    @Override
+    public Activity getActivityForView() {
+        return this;
+    }
+
+    public DrawerLayout getDrawerLayout() {
+        return drawerLayout;
+    }
+
+    public SwipeRefreshLayout getSwipeRefresh() {
+        return swipeRefresh;
+    }
+
+    public ScrollView getWeatherLayout() {
+        return weatherLayout;
+    }
+
+    public TextView getTitleCity() {
+        return titleCity;
+    }
+
+    public TextView getTitleUpdateTime() {
+        return titleUpdateTime;
+    }
+
+    public TextView getDegreeText() {
+        return degreeText;
+    }
+
+    public TextView getWeatherInfoText() {
+        return weatherInfoText;
+    }
+
+    public LinearLayout getLayoutForecast() {
+        return layoutForecast;
+    }
+
+    public ImageView getBingPicImg() {
+        return bingPicImg;
+    }
+
+    public String getmCityId() {
+        return mCityId;
+    }
+
+    public Button getNavButton() {
+        return navButton;
+    }
+
+    public void setmCityId(String mCityId) {
+        this.mCityId = mCityId;
     }
 }

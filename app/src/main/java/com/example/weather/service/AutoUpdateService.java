@@ -8,18 +8,12 @@ import android.content.SharedPreferences;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
-import android.widget.Toast;
 
-import androidx.annotation.Nullable;
-
-import com.bumptech.glide.Glide;
-import com.example.weather.WeatherActivity;
 import com.example.weather.gson.Weather;
 import com.example.weather.util.HttpUtil;
 import com.example.weather.util.Utility;
 
 import java.io.IOException;
-import java.security.Provider;
 
 import okhttp3.Call;
 import okhttp3.Callback;
