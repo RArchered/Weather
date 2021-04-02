@@ -3,13 +3,11 @@ package com.example.weather.concretepage;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.preference.PreferenceManager;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.example.weather.data.TasksRepository;
-import com.example.weather.gson.Weather;
-import com.example.weather.startpage.StartPagePresenter;
+import com.example.weather.gson.weather.Weather;
 import com.example.weather.util.HttpUtil;
 import com.example.weather.util.Utility;
 
@@ -23,11 +21,14 @@ public class ConcretePagePresenter implements ConcretePageContract.Presenter {
     ConcretePageContract.View mConcretePageView;
     TasksRepository mTasksRepository;
 
+    private String bingPicUrl;
+
     public ConcretePagePresenter(TasksRepository tasksRepository,
-                                ConcretePageContract.View conCretePageView) {
+                                 ConcretePageContract.View conCretePageView) {
         mConcretePageView = conCretePageView;
         mTasksRepository = tasksRepository;
         mConcretePageView.setPresenter(this);
+        mTasksRepository.setPresenter(this);
 
     }
 
@@ -35,7 +36,8 @@ public class ConcretePagePresenter implements ConcretePageContract.Presenter {
         return mTasksRepository.getDefaultSharedPreferences(context);
     }
 
-    public void requestWeather(final String cityId) {
+
+    public void requestWeather(String cityId) {
         String weatherUrl = "https://tianqiapi.com/api?version=v1" +
                 "&appid=89131264&appsecret=nSwK7fA7" +
                 "&cityid=" + cityId;
@@ -75,28 +77,25 @@ public class ConcretePagePresenter implements ConcretePageContract.Presenter {
                 });
             }
         });
-        loadBingPic();//refresh bing pic when request weather info.
+        requestBingPic();//refresh bing pic when request weather info.
+    }
+
+    public void requestBingPic() {
+        mTasksRepository.refreshBingPicUrl();
     }
 
     public void loadBingPic() {
-        String requestBingPic = "http://guolin.tech/api/bing_pic";
-        HttpUtil.sendOkHttpRequest(requestBingPic, new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-                e.printStackTrace();
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                final String bingPic = response.body().string();
-                final Activity activity = mConcretePageView.getActivityForView();
-                SharedPreferences.Editor editor = getDefaultSharedPreferences(activity).edit();
-                editor.putString("bing_pic", bingPic);
-                editor.apply();
-                activity.runOnUiThread(() -> {
-                    Glide.with(activity).load(bingPic).into(mConcretePageView.getBingPicImg());
-                });
-            }
+        final Activity activity = mConcretePageView.getActivityForView();
+        SharedPreferences.Editor editor = getDefaultSharedPreferences(activity).edit();
+        editor.putString("bing_pic", bingPicUrl);
+        editor.apply();
+        activity.runOnUiThread(() -> {
+            Glide.with(activity).load(bingPicUrl).into(mConcretePageView.getBingPicImg());
         });
     }
+
+    public void setBingPicUrl(String bingPicUrl) {
+        this.bingPicUrl = bingPicUrl;
+    }
+
 }

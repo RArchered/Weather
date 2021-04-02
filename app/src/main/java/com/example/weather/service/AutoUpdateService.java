@@ -9,7 +9,7 @@ import android.os.IBinder;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 
-import com.example.weather.gson.Weather;
+import com.example.weather.gson.weather.Weather;
 import com.example.weather.util.HttpUtil;
 import com.example.weather.util.Utility;
 

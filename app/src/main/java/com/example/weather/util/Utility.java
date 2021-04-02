@@ -7,7 +7,8 @@ import android.text.TextUtils;
 import com.example.weather.data.db.TianqiCity;
 import com.example.weather.data.db.TianqiLeader;
 import com.example.weather.data.db.TianqiProvince;
-import com.example.weather.gson.Weather;
+import com.example.weather.gson.bingpic.BingPic;
+import com.example.weather.gson.weather.Weather;
 import com.google.gson.Gson;
 
 import org.json.JSONArray;
@@ -25,6 +26,15 @@ public class Utility {
     public static Weather handleWeatherResponse(String response) {
         try {
             return new Gson().fromJson(response, Weather.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static BingPic handleBingPicResponse(String response) {
+        try {
+            return new Gson().fromJson(response, BingPic.class);
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -6,10 +6,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.widget.RemoteViews;
-import android.widget.TextView;
 
 import com.example.weather.R;
-import com.example.weather.gson.Weather;
+import com.example.weather.gson.weather.Weather;
 import com.example.weather.util.Utility;
 
 public class WeatherAppWidget extends AppWidgetProvider {

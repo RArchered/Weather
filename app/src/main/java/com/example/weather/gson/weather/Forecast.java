@@ -1,4 +1,4 @@
-package com.example.weather.gson;
+package com.example.weather.gson.weather;
 
 public class Forecast {
     public String day;

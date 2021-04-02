@@ -1,5 +1,6 @@
-package com.example.weather.gson;
+package com.example.weather.gson.weather;
 
+import com.example.weather.gson.weather.Forecast;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.List;

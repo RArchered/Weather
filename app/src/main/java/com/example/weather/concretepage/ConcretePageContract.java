@@ -14,7 +14,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.example.weather.BasePresenter;
 import com.example.weather.BaseView;
-import com.example.weather.gson.Weather;
+import com.example.weather.gson.weather.Weather;
 
 public interface ConcretePageContract {
     interface View extends BaseView<Presenter> {
@@ -41,5 +41,6 @@ public interface ConcretePageContract {
         public SharedPreferences getDefaultSharedPreferences(Context context);
         public void requestWeather(final String cityId);
         public void loadBingPic();
+        public void setBingPicUrl(String bingPicUrl);
     }
 }
