@@ -9,4 +9,4 @@ Presenter层调用View层的引用来刷新数据。
   <img src="https://github.com/RArchered/Weather/blob/main/README/Weather2.jpg" width="300"  alt="效果1"/>
   <img src="https://github.com/RArchered/Weather/blob/main/README/Weather3.jpg" width="300"  alt="效果2"/>
 </div>
-Ps:UI布局参考《第一行代码》
+Ps:UI布局参考郭霖《第一行代码》第二版
